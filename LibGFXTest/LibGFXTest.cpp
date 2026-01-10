@@ -159,9 +159,6 @@ int main()
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		// Update uniform buffer for this frame
-		updateUniformBuffer(context.get(), uniformBuffers[currentFrame]);
-
 		// Wait for the fence to be signaled from the last frame
 		context->waitForFence(inFlightFences[currentFrame]);
 
@@ -175,6 +172,9 @@ int main()
 		}
 		imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 		context->resetFence(inFlightFences[currentFrame]);
+
+		// Update uniform buffer for this frame
+		updateUniformBuffer(context.get(), uniformBuffers[imageIndex]);
 
 		// Record command buffer, begin render pass and bind pipeline
 		context->beginCommandBuffer(commandBuffers[imageIndex]);
