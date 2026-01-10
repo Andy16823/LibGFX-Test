@@ -76,86 +76,68 @@ void updateUniformBuffer(LibGFX::VkContext* context, LibGFX::Buffer& uniformBuff
 
 int main()
 {
-	// 1. Create window
+	// Create an GLFW window for the application
 	auto window = LibGFX::GFX::createWindow(800, 600, "LibGFX Test Window");
 
-	// 2. Create Vulkan context and initialize it. It will select physical device, create logical device, queues, surface, instance
+	// Create the Vulkan context and initialize it
 	auto context = LibGFX::GFX::createContext(window);
 	context->initialize(LibGFX::VkContext::defaultAppInfo());
 
-	// 3. Create the swapchain with desired present mode
+	// Create the swapchain with the desired present mode
 	auto swapchainInfo = context->createSwapChain(VK_PRESENT_MODE_MAILBOX_KHR);
 
-	// 4. Create an depth buffer with the best suitable format
+	// Create an optimal depth format and depth buffer
 	VkFormat bestDepthFormat = context->findSuitableDepthFormat();
 	auto depthBuffer = context->createDepthBuffer(swapchainInfo.extent, bestDepthFormat);
 
-	// 5. Create default render pass. You can also create your own render pass by inheriting from LibGFX::RenderPass but this requires
-	// more code and understanding of Vulkan render passes.
+	// Create an render pass. Here we use the default render pass preset from LibGFX.
 	auto renderPass = std::make_unique<LibGFX::Presets::DefaultRenderPass>();
 	if (!renderPass->create(context->getDevice(), swapchainInfo.surfaceFormat.format, depthBuffer.format)) {
 		cerr << "Failed to create default render pass!" << endl;
 		return -1;
 	}
 
-	// 6. Create the pipeline. This requires a bit more code from you since there is no default pipeline preset. You need to create your own pipeline
-	// inherit from LibGFX::Pipeline. Here we use a DefaultPipeline class defined in this test project. Its nessesare because Pipelines are very 
-	// specific to your application and how you want to render things.
+	// Create the graphics pipeline. You need to create the pipeline for yourself.
 	auto pipeline = std::make_unique<DefaultPipeline>();
 	auto viewport = context->createViewport(0.0f, 0.0f, swapchainInfo.extent);
 	auto scissor = context->createScissorRect(0, 0, swapchainInfo.extent);
 	pipeline->create(context.get(), renderPass->getRenderPass(), viewport, scissor);
 
-	// 7. Now we need framebuffers for each swapchain image. We can use the context function here.
+	// Create framebuffer for each swapchain image
 	auto framebuffers = context->createFramebuffers(*renderPass, swapchainInfo, depthBuffer);
 
-	// 8. Next we need to create the command pools for the command buffers. For this we need the graphics queue family index and define
-	// a flag that allows us to reset command buffers individually.
+	// Create a command pool for command buffer allocation
 	auto queueFamilyIndices = context->getQueueFamilyIndices(context->getPhysicalDevice());
 	auto commandPool = context->createCommandPool(queueFamilyIndices.graphicsFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-	// 9. allocate command buffers for each framebuffer // TODO: Change to allocCommandBuffers in VkContext since we are not creating we are allocating them
-	// from the command pool.
+	// Allocate command buffers from the command pool
 	auto commandBuffers = context->allocateCommandBuffers(commandPool, static_cast<uint32_t>(framebuffers.size()));
 
-	// 10. In order to use textures we need to create samplers. Here we create a default texture sampler with anisotropic filtering enabled.
-	// You can also create your own sampler by using the createSampler function in VkContext with a custom VkSamplerCreateInfo structure.
+	// Create a texture sampler
 	auto textureSampler = context->createTextureSampler(true, 16.0f);
 
-	// 11. For our uniform buffers we need to create descriptor pools and sets.
-	// We need an descriptor pool for our 'UniformBufferObject' uniform buffers. We want that every frame inflight has its own uniform buffer.
-	// This means we need an pool size for each framebuffer in the swapchain. and we need to set the max sets to the number of framebuffers as well.
+	// Create buffers for rendering
+	auto vertexBuffer = createVertexBuffer(context.get());				// Vertex buffer
+	auto indexBuffer = createIndexBuffer(context.get());				// Index buffer
+	std::vector<LibGFX::Buffer> uniformBuffers;							// Uniform buffers for each frame inflight
+	for (size_t i = 0; i < framebuffers.size(); i++) {
+		uniformBuffers.push_back(createUniformBuffer(context.get()));	// Create uniform buffer for the model-view-projection matrices
+	}
+
+	// Create descriptor pool for the uniform buffers
 	LibGFX::DescriptorPoolBuilder descriptorPoolBuilder;
 	descriptorPoolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(framebuffers.size()));
 	descriptorPoolBuilder.setMaxSets(static_cast<uint32_t>(framebuffers.size()));
 	auto descriptorPool = descriptorPoolBuilder.build(*context);
 	descriptorPoolBuilder.clear();
 
-	// 12. Create semaphores and fences for rendering synchronization
-	// In order to synchronize the rendering process we need sets of semaphores and fences.
-	// we need one set for each framebuffer in the swapchain.
-	int currentFrame = 0;
-	int maxFraomesInFlight = static_cast<int>(framebuffers.size());
-	std::vector<VkFence> imagesInFlight(maxFraomesInFlight, VK_NULL_HANDLE);
-	auto imageAvailableSemaphores = context->createSemaphores(static_cast<uint32_t>(framebuffers.size()));
-	auto renderFinishedSemaphores = context->createSemaphores(static_cast<uint32_t>(framebuffers.size()));
-	auto inFlightFences = context->createFences(static_cast<uint32_t>(framebuffers.size()), VK_FENCE_CREATE_SIGNALED_BIT);
-
-	// Test buffer
-	auto vertexBuffer = createVertexBuffer(context.get());
-	auto indexBuffer = createIndexBuffer(context.get());
-	std::vector<LibGFX::Buffer> uniformBuffers;
-	for (size_t i = 0; i < framebuffers.size(); i++) {
-		uniformBuffers.push_back(createUniformBuffer(context.get()));
-	}
-
+	// Create the descriptor sets for each framebuffer
 	LibGFX::DescriptorSetWriter descriptorSetWriter;
 	std::vector<VkDescriptorSet> descriptorSets;
 	for (size_t i = 0; i < framebuffers.size(); i++) {
-		auto uniformBuffer = uniformBuffers[i];
+		auto buffer = uniformBuffers[i];
 		auto descriptorSet = context->allocateDescriptorSet(descriptorPool, pipeline->getUniformsLayout());
-		
-		descriptorSetWriter.addBufferInfo(uniformBuffer.buffer, 0, uniformBuffer.size)
+		descriptorSetWriter.addBufferInfo(buffer.buffer, 0, buffer.size)
 			.setDstBinding(0)
 			.setDstArrayElement(0)
 			.setDescriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
@@ -165,8 +147,15 @@ int main()
 		descriptorSets.push_back(descriptorSet);
 	}
 
+	// Create synchronization objects
+	int currentFrame = 0;
+	int maxFramesInFlight = static_cast<int>(framebuffers.size());
+	std::vector<VkFence> imagesInFlight(maxFramesInFlight, VK_NULL_HANDLE);
+	auto imageAvailableSemaphores = context->createSemaphores(static_cast<uint32_t>(framebuffers.size()));
+	auto renderFinishedSemaphores = context->createSemaphores(static_cast<uint32_t>(framebuffers.size()));
+	auto inFlightFences = context->createFences(static_cast<uint32_t>(framebuffers.size()), VK_FENCE_CREATE_SIGNALED_BIT);
 
-	// 13. Initialize is done. We can now enter the main loop.
+	// Main loop
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -176,24 +165,27 @@ int main()
 		// Wait for the fence to be signaled from the last frame
 		context->waitForFence(inFlightFences[currentFrame]);
 
+		// Acquire next image from the swapchain
 		uint32_t imageIndex; 
 		context->acquireNextImage(swapchainInfo, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, imageIndex);
 
+		// Check if a previous frame is using this image (i.e. there is its fence to wait on)
 		if(imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
 			context->waitForFence(imagesInFlight[imageIndex]);
 		}
 		imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 		context->resetFence(inFlightFences[currentFrame]);
 
-		// Record command buffer
+		// Record command buffer, begin render pass and bind pipeline
 		context->beginCommandBuffer(commandBuffers[imageIndex]);
 		context->beginRenderPass(commandBuffers[imageIndex], *renderPass.get(), framebuffers[imageIndex], swapchainInfo.extent);
 		context->bindPipeline(commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline.get());
 
-		// Draw call
+		// Begin draw call
 		VkDescriptorSet descriptorSet = descriptorSets[imageIndex];
 		VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
 
+		// Bind descriptor sets to the pipeline
 		std::array<VkDescriptorSet, 1> descriptorSetsToBind = { descriptorSet };
 		vkCmdBindDescriptorSets(commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -205,12 +197,12 @@ int main()
 			nullptr
 		);
 
+		// Bind vertex and index buffers and issue draw call
 		VkBuffer vertexBuffers[] = { vertexBuffer.buffer };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, std::array<VkDeviceSize, 1>{0}.data());
 		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-		// End draw call
 
-
+		// End render pass and command buffer recording
 		context->endRenderPass(commandBuffers[imageIndex]);
 		context->endCommandBuffer(commandBuffers[imageIndex]);
 
@@ -242,23 +234,25 @@ int main()
 		presentInfo.pImageIndices = &imageIndex;
 
 		context->queuePresent(presentInfo);
-		currentFrame = (currentFrame + 1) % maxFraomesInFlight;
+
+		// Advance to the next frame
+		currentFrame = (currentFrame + 1) % maxFramesInFlight;
 	}
 
 	// Wait for device to be idle before cleanup
 	context->waitIdle();
 
-	// Destroy test buffers
+	// Destroy synchronization objects
+	context->destroySemaphores(imageAvailableSemaphores);
+	context->destroySemaphores(renderFinishedSemaphores);
+	context->destroyFences(inFlightFences);
+
+	// Destroy buffers
 	context->destroyBuffer(vertexBuffer);
 	context->destroyBuffer(indexBuffer);
 	for (auto uniformBuffer : uniformBuffers) {
 		context->destroyBuffer(uniformBuffer);
 	}
-
-	// Destroy synchronization objects
-	context->destroySemaphores(imageAvailableSemaphores);
-	context->destroySemaphores(renderFinishedSemaphores);
-	context->destroyFences(inFlightFences);
 
 	// Destroy descriptor pool
 	context->destroyDescriptorSetPool(descriptorPool);
@@ -272,16 +266,22 @@ int main()
 	}
 	context->destroyCommandPool(commandPool);
 
-	// Cleanup
+	// Destroy framebuffers
 	for (auto framebuffer : framebuffers) {
 		context->destroyFramebuffer(framebuffer);
 	}
+
+	// Destroy pipeline and render pass
 	pipeline->destroy(context.get());
 	renderPass->destroy(context->getDevice());
+
+	// Destroy depth buffer and swapchain
 	context->destroyDepthBuffer(depthBuffer);
 	context->destroySwapChain(swapchainInfo);
+
+	// Dispose the Vulkan context
 	context->dispose();
 
-	std::cout << "Hello CMake." << endl;
+	std::cout << "Bye Triangle!" << std::endl;
 	return 0;
 }
