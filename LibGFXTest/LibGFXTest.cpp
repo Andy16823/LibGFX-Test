@@ -1,6 +1,7 @@
 ﻿// LibGFXTest.cpp: Definiert den Einstiegspunkt für die Anwendung.
 //
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define STB_IMAGE_IMPLEMENTATION
 #include <glm/glm.hpp>
 #include <memory>
 #include "LibGFXTest.h"
@@ -14,6 +15,8 @@
 #include "Vertex.h"
 #include "DescriptorSetWriter.h"
 #include <array>
+#include "Imaging.h"
+#include "stb_image.h"
 
 using namespace std;
 
@@ -22,12 +25,27 @@ struct UniformBufferObject {
 	glm::mat4 proj;
 };
 
+LibGFX::ImageData createImageData(const std::string& imagePath) {
+	int texWidth, texHeight, texChannels;
+	stbi_uc* pixels = stbi_load(imagePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+	if (!pixels) {
+		throw std::runtime_error("Failed to load texture image!");
+	}
+	LibGFX::ImageData imageData;
+	imageData.pixels = pixels;
+	imageData.width = static_cast<uint32_t>(texWidth);
+	imageData.height = static_cast<uint32_t>(texHeight);
+	imageData.format = VK_FORMAT_R8G8B8A8_UNORM;
+	return imageData;
+}
+
 LibGFX::Buffer createVertexBuffer(LibGFX::VkContext* context) {
 
 	auto vertices = std::vector<Vertex3D>{
-		{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-		{{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-		{{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+		{{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // Top Left
+		{{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // Top Right
+		{{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // Bottom Right
+		{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // Bottom Left
 	};
 
 	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -45,7 +63,8 @@ LibGFX::Buffer createVertexBuffer(LibGFX::VkContext* context) {
 
 LibGFX::Buffer createIndexBuffer(LibGFX::VkContext* context) {
 	auto indices = std::vector<uint16_t>{
-		0, 1, 2
+		0, 2, 3, // First Triangle
+		0, 1, 2  // Second Triangle
 	};
 	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 	LibGFX::Buffer indexBuffer = context->createBuffer(
@@ -113,9 +132,6 @@ int main()
 	// Allocate command buffers from the command pool
 	auto commandBuffers = context->allocateCommandBuffers(commandPool, static_cast<uint32_t>(framebuffers.size()));
 
-	// Create a texture sampler
-	auto textureSampler = context->createTextureSampler(true, 16.0f);
-
 	// Create buffers for rendering
 	auto vertexBuffer = createVertexBuffer(context.get());				// Vertex buffer
 	auto indexBuffer = createIndexBuffer(context.get());				// Index buffer
@@ -131,7 +147,7 @@ int main()
 	auto descriptorPool = descriptorPoolBuilder.build(*context);
 	descriptorPoolBuilder.clear();
 
-	// Create the descriptor sets for each framebuffer
+	// Create the uniform descriptor sets for the matrices for each framebuffer
 	LibGFX::DescriptorSetWriter descriptorSetWriter;
 	std::vector<VkDescriptorSet> descriptorSets;
 	for (size_t i = 0; i < framebuffers.size(); i++) {
@@ -143,6 +159,25 @@ int main()
 
 		descriptorSets.push_back(descriptorSet);
 	}
+
+	// Create texture image, image view and texture sampler
+	auto imageData = createImageData("C:/Users/andy1/Downloads/images.png");
+	auto textureSampler = context->createTextureSampler(true, 16.0f);
+	auto image = context->createImage(imageData, commandPool);
+	imageData.pixels = nullptr; // Image data has been copied to GPU, we can free the pixel data now
+
+	// Create descriptor pool for the texture sampler
+	LibGFX::DescriptorPoolBuilder textureDescriptorPoolBuilder;
+	textureDescriptorPoolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
+	textureDescriptorPoolBuilder.setMaxSets(1);
+	auto textureDescriptorPool = textureDescriptorPoolBuilder.build(*context);
+
+	// Create descriptor set for the texture sampler. Layout is defined in the pipeline.
+	VkDescriptorSet textureDescriptorSet = context->allocateDescriptorSet(textureDescriptorPool, pipeline->getTextureLayout());
+	LibGFX::DescriptorSetWriter textureDescriptorSetWriter;
+	textureDescriptorSetWriter.addImageInfo(image.imageView, textureSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		.write(*context, textureDescriptorSet, 0, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+		.clear();
 
 	// Create synchronization objects
 	int currentFrame = 0;
@@ -183,7 +218,7 @@ int main()
 		VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
 
 		// Bind descriptor sets to the pipeline
-		std::array<VkDescriptorSet, 1> descriptorSetsToBind = { descriptorSet };
+		std::array<VkDescriptorSet, 2> descriptorSetsToBind = { descriptorSet, textureDescriptorSet };
 		vkCmdBindDescriptorSets(commandBuffer,
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			pipeline->getPipelineLayout(),
@@ -197,7 +232,8 @@ int main()
 		// Bind vertex and index buffers and issue draw call
 		VkBuffer vertexBuffers[] = { vertexBuffer.buffer };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, std::array<VkDeviceSize, 1>{0}.data());
-		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
 
 		// End render pass and command buffer recording
 		context->endRenderPass(commandBuffers[imageIndex]);
@@ -244,6 +280,11 @@ int main()
 	context->destroySemaphores(renderFinishedSemaphores);
 	context->destroyFences(inFlightFences);
 
+	// Destroy texture image
+	context->destroySampler(textureSampler);
+	context->destroyImage(image);
+	context->destroyDescriptorSetPool(textureDescriptorPool);
+
 	// Destroy buffers
 	context->destroyBuffer(vertexBuffer);
 	context->destroyBuffer(indexBuffer);
@@ -253,9 +294,6 @@ int main()
 
 	// Destroy descriptor pool
 	context->destroyDescriptorSetPool(descriptorPool);
-
-	// Destroy texture sampler
-	context->destroySampler(textureSampler);
 
 	// Destroy command buffers
 	for (auto commandBuffer : commandBuffers) {

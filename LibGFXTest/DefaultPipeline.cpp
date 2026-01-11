@@ -16,6 +16,10 @@ void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass
 		.build(*context);
 	descriptorSetLayoutBuilder.clear();
 
+	m_textureLayout = descriptorSetLayoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
+		.build(*context);
+	descriptorSetLayoutBuilder.clear();
+
 	// Vertex shader for this pipeline
 	auto vertexShaderCode = LibGFX::GFX::readFile("C:\\Users\\andy1\\source\\repos\\LibGFXTest\\Shader\\vert.spv");
 	auto vertexShaderModule = context->createShaderModule(vertexShaderCode);
@@ -134,7 +138,7 @@ void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass
 	colorBlending.pAttachments = &colorBlendAttachment;
 
 	// Pipeline Layout
-	std::array<VkDescriptorSetLayout, 1> layouts = { m_uniformsLayout };
+	std::array<VkDescriptorSetLayout, 2> layouts = { m_uniformsLayout, m_textureLayout };
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(layouts.size());
@@ -181,8 +185,8 @@ void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass
 void DefaultPipeline::destroy(LibGFX::VkContext* context)
 {
 	VkDevice device = context->getDevice();
-	// Free descriptor set layouts
 	context->destroyDescriptorSetLayout(m_uniformsLayout);
+	context->destroyDescriptorSetLayout(m_textureLayout);
 
 	// Destroy pipeline and pipeline layout
 	vkDestroyPipeline(device, m_pipeline, nullptr);

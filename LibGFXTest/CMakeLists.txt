@@ -4,7 +4,7 @@
 add_executable(LibGFXTest
     LibGFXTest.cpp
     # Weitere . cpp Dateien hier
- "DefaultPipeline.h" "DefaultPipeline.cpp" "Vertex.h")
+ "DefaultPipeline.h" "DefaultPipeline.cpp" "Vertex.h"  "stb_image.h")
 
 # LibGFX linken (GLFW und Vulkan kommen automatisch mit)
 target_link_libraries(LibGFXTest 
