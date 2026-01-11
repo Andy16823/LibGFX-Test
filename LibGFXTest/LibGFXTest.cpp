@@ -138,12 +138,9 @@ int main()
 		auto buffer = uniformBuffers[i];
 		auto descriptorSet = context->allocateDescriptorSet(descriptorPool, pipeline->getUniformsLayout());
 		descriptorSetWriter.addBufferInfo(buffer.buffer, 0, buffer.size)
-			.setDstBinding(0)
-			.setDstArrayElement(0)
-			.setDescriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-			.write(*context, descriptorSet);
+			.write(*context, descriptorSet, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			.clear();
 
-		descriptorSetWriter.clear();
 		descriptorSets.push_back(descriptorSet);
 	}
 
