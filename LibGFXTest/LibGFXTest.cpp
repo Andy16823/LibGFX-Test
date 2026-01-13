@@ -100,7 +100,7 @@ int main()
 
 	// Create the Vulkan context and initialize it
 	auto context = LibGFX::GFX::createContext(window);
-	context->initialize(LibGFX::VkContext::defaultAppInfo());
+	context->initialize(LibGFX::VkContext::defaultAppInfo(), true);
 
 	// Create the swapchain with the desired present mode
 	auto swapchainInfo = context->createSwapChain(VK_PRESENT_MODE_MAILBOX_KHR);
@@ -168,8 +168,8 @@ int main()
 
 	// Create descriptor pool for the texture sampler
 	LibGFX::DescriptorPoolBuilder textureDescriptorPoolBuilder;
-	textureDescriptorPoolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1);
-	textureDescriptorPoolBuilder.setMaxSets(1);
+	textureDescriptorPoolBuilder.addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250);
+	textureDescriptorPoolBuilder.setMaxSets(250);
 	auto textureDescriptorPool = textureDescriptorPoolBuilder.build(*context);
 
 	// Create descriptor set for the texture sampler. Layout is defined in the pipeline.
