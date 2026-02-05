@@ -5,28 +5,28 @@
 #include "LibGFX.h"
 #include "DescriptorSetLayoutBuilder.h"
 
-void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass)
+void DefaultPipeline::create(LibGFX::VkContext& context, VkRenderPass renderPass)
 {
 	// Get device from context
-	VkDevice device = context->getDevice();
+	VkDevice device = context.getDevice();
 
 	// Uniforms layout for projection and view matrices
 	LibGFX::DescriptorSetLayoutBuilder descriptorSetLayoutBuilder;
 	m_uniformsLayout = descriptorSetLayoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 1)
-		.build(*context);
+		.build(context);
 	descriptorSetLayoutBuilder.clear();
 
 	m_textureLayout = descriptorSetLayoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
-		.build(*context);
+		.build(context);
 	descriptorSetLayoutBuilder.clear();
 
 	// Vertex shader for this pipeline
 	auto vertexShaderCode = LibGFX::GFX::readFile("C:\\Users\\andy1\\source\\repos\\LibGFXTest\\Shader\\vert.spv");
-	auto vertexShaderModule = context->createShaderModule(vertexShaderCode);
+	auto vertexShaderModule = context.createShaderModule(vertexShaderCode);
 
 	// Fragment shader for this pipeline
 	auto fragmentShaderCode = LibGFX::GFX::readFile("C:\\Users\\andy1\\source\\repos\\LibGFXTest\\Shader\\frag.spv");
-	auto fragmentShaderModule = context->createShaderModule(fragmentShaderCode);
+	auto fragmentShaderModule = context.createShaderModule(fragmentShaderCode);
 
 	// Shader Stage
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -182,11 +182,11 @@ void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass
 	vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
 }
 
-void DefaultPipeline::destroy(LibGFX::VkContext* context)
+void DefaultPipeline::destroy(LibGFX::VkContext& context)
 {
-	VkDevice device = context->getDevice();
-	context->destroyDescriptorSetLayout(m_uniformsLayout);
-	context->destroyDescriptorSetLayout(m_textureLayout);
+	VkDevice device = context.getDevice();
+	context.destroyDescriptorSetLayout(m_uniformsLayout);
+	context.destroyDescriptorSetLayout(m_textureLayout);
 
 	// Destroy pipeline and pipeline layout
 	vkDestroyPipeline(device, m_pipeline, nullptr);

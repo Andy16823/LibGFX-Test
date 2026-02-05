@@ -17,8 +17,8 @@ private:
 public:
 	void setViewport(VkViewport viewport) { m_viewport = viewport; }
 	void setScissor(VkRect2D scissor) { m_scissor = scissor; }
-	void create(LibGFX::VkContext* context, VkRenderPass renderPass);
-	void destroy(LibGFX::VkContext* context);
+	void create(LibGFX::VkContext& context, VkRenderPass renderPass);
+	void destroy(LibGFX::VkContext& context);
 	VkPipeline getPipeline() const override;
 	VkPipelineLayout getPipelineLayout() const override;
 	VkDescriptorSetLayout getUniformsLayout() const { return m_uniformsLayout; }

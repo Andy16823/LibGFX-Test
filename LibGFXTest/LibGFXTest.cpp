@@ -111,7 +111,7 @@ int main()
 
 	// Create an render pass. Here we use the default render pass preset from LibGFX.
 	auto renderPass = std::make_unique<LibGFX::Presets::DefaultRenderPass>();
-	if (!renderPass->create(context->getDevice(), swapchainInfo.surfaceFormat.format, depthBuffer.format)) {
+	if (!renderPass->create(*context, swapchainInfo.surfaceFormat.format, depthBuffer.format)) {
 		cerr << "Failed to create default render pass!" << endl;
 		return -1;
 	}
@@ -122,7 +122,7 @@ int main()
 	auto scissor = context->createScissorRect(0, 0, swapchainInfo.extent);
 	pipeline->setViewport(viewport);
 	pipeline->setScissor(scissor);
-	pipeline->create(context.get(), renderPass->getRenderPass());
+	pipeline->create(*context.get(), renderPass->getRenderPass());
 
 	// Create framebuffer for each swapchain image
 	auto framebuffers = context->createFramebuffers(*renderPass, swapchainInfo, depthBuffer);
@@ -309,8 +309,8 @@ int main()
 	}
 
 	// Destroy pipeline and render pass
-	pipeline->destroy(context.get());
-	renderPass->destroy(context->getDevice());
+	pipeline->destroy(*context);
+	renderPass->destroy(*context);
 
 	// Destroy depth buffer and swapchain
 	context->destroyDepthBuffer(depthBuffer);
