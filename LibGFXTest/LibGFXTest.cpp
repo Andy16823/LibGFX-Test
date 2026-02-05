@@ -122,7 +122,8 @@ int main()
 	auto scissor = context->createScissorRect(0, 0, swapchainInfo.extent);
 	pipeline->setViewport(viewport);
 	pipeline->setScissor(scissor);
-	pipeline->create(*context.get(), renderPass->getRenderPass());
+	pipeline->setRenderPass(renderPass->getRenderPass());
+	pipeline->create(*context);
 
 	// Create framebuffer for each swapchain image
 	auto framebuffers = context->createFramebuffers(*renderPass, swapchainInfo, depthBuffer);

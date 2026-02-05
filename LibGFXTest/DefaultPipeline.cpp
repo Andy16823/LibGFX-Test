@@ -5,7 +5,7 @@
 #include "LibGFX.h"
 #include "DescriptorSetLayoutBuilder.h"
 
-void DefaultPipeline::create(LibGFX::VkContext& context, VkRenderPass renderPass)
+void DefaultPipeline::create(LibGFX::VkContext& context)
 {
 	// Get device from context
 	VkDevice device = context.getDevice();
@@ -170,7 +170,7 @@ void DefaultPipeline::create(LibGFX::VkContext& context, VkRenderPass renderPass
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.layout = m_pipelineLayout;
-	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.renderPass = m_renderPass;
 	pipelineInfo.subpass = 0;
 
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS) {

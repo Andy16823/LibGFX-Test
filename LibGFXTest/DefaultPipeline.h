@@ -13,11 +13,13 @@ private:
 	VkDescriptorSetLayout m_textureLayout;
 	VkViewport m_viewport;
 	VkRect2D m_scissor;
+	VkRenderPass m_renderPass;
 
 public:
 	void setViewport(VkViewport viewport) { m_viewport = viewport; }
 	void setScissor(VkRect2D scissor) { m_scissor = scissor; }
-	void create(LibGFX::VkContext& context, VkRenderPass renderPass);
+	void setRenderPass(VkRenderPass renderPass) { m_renderPass = renderPass; }
+	void create(LibGFX::VkContext& context);
 	void destroy(LibGFX::VkContext& context);
 	VkPipeline getPipeline() const override;
 	VkPipelineLayout getPipelineLayout() const override;
