@@ -5,7 +5,7 @@
 #include "LibGFX.h"
 #include "DescriptorSetLayoutBuilder.h"
 
-void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass, VkViewport viewport, VkRect2D scissor)
+void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass)
 {
 	// Get device from context
 	VkDevice device = context->getDevice();
@@ -86,9 +86,9 @@ void DefaultPipeline::create(LibGFX::VkContext* context, VkRenderPass renderPass
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
+	viewportState.pViewports = &m_viewport;
 	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
+	viewportState.pScissors = &m_scissor;
 
 	// Dynamic State
 	std::array<VkDynamicState, 2> dynamicStates = {

@@ -120,7 +120,9 @@ int main()
 	auto pipeline = std::make_unique<DefaultPipeline>();
 	auto viewport = context->createViewport(0.0f, 0.0f, swapchainInfo.extent);
 	auto scissor = context->createScissorRect(0, 0, swapchainInfo.extent);
-	pipeline->create(context.get(), renderPass->getRenderPass(), viewport, scissor);
+	pipeline->setViewport(viewport);
+	pipeline->setScissor(scissor);
+	pipeline->create(context.get(), renderPass->getRenderPass());
 
 	// Create framebuffer for each swapchain image
 	auto framebuffers = context->createFramebuffers(*renderPass, swapchainInfo, depthBuffer);
@@ -161,7 +163,7 @@ int main()
 	}
 
 	// Create texture image, image view and texture sampler
-	auto imageData = createImageData("C:/Users/andy1/Downloads/images.png");
+	auto imageData = createImageData("C:/Users/andy1/Pictures/CF Logo 2.jpg");
 	auto textureSampler = context->createTextureSampler(true, 16.0f);
 	auto image = context->createImage(imageData, commandPool);
 	imageData.pixels = nullptr; // Image data has been copied to GPU, we can free the pixel data now
